@@ -1,20 +1,20 @@
 /**
 UNIX Shell Project
-                                                                                                                                                                                              
-Sistemas Operativos                                                                                                                                                                           
-Grados I. Informatica, Computadores & Software                                                                                                                                                
-Dept. Arquitectura de Computadores - UMA                                                                                                                                                      
-                                                                                                                                                                                              
-Some code adapted from "Fundamentos de Sistemas Operativos", Silberschatz et al.                                                                                                              
-                                                                                                                                                                                              
-To compile and run the program:                                                                                                                                                               
-   $ gcc Shell_project.c job_control.c -o Shell                                                                                                                                               
-   $ ./Shell                                                                                                                                                                                  
-        (then type ^D to exit program)                                                                                                                                                        
-                                                                                                                                                                                              
-**/                                                                                                                                                                                           
-                                                                                                                                                                                              
-#include "job_control.h"   // remember to compile with module job_control.c                                                                                                                   
+
+Sistemas Operativos
+Grados I. Informatica, Computadores & Software
+Dept. Arquitectura de Computadores - UMA
+
+Some code adapted from "Fundamentos de Sistemas Operativos", Silberschatz et al.
+
+To compile and run the program:
+   $ gcc Shell_project.c job_control.c -o Shell
+   $ ./Shell          
+        (then type ^D to exit program)
+
+**/
+
+#include "job_control.h"   // remember to compile with module job_control.c 
 
 #define MAX_LINE 256 /* 256 chars per line, per command, should be enough. */
 #include <string.h>
@@ -141,6 +141,19 @@ int main(void)
                         printf("hola mundo\n");
                         continue;
                 }
+
+                if (! strcmp(args[0],"cd")) {
+                        int err;
+                        if(args[1]==NULL) {
+                                err = chdir (getenv("HOME"));
+                        }
+                        else {
+                                err = chdir (args[1]);
+                        }
+                        if (err) {fprintf(stderr, "Error en chdir\n");}
+                        continue;
+                }
+
 
                 if(! strcmp(args[0],"jobs")) {
                         block_SIGCHLD();                 
