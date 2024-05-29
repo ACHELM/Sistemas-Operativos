@@ -34,6 +34,8 @@ int main(void)
 	enum status status_res; /* status processed by analyze_status() */
 	int info;				/* info processed by analyze_status() */
 
+	terminal_signals(SIG_IGN); //^z ^c -> inmune, superpoderes de terminal
+
 	while (1)   /* Program terminates normally inside get_command() after ^D is typed*/
 	{   		
 		printf("COMMAND->");
@@ -57,7 +59,9 @@ int main(void)
 			if (err) {fprintf(stderr, "Error en chdir\n");}
 			continue;
 		}
-		pid_fork = fork();
+
+
+		pid_fork = fork(); // Comando externo
 
 		if (pid_fork > 0) {
 			// PADRE -> Shell
@@ -65,13 +69,30 @@ int main(void)
 			if (background) {
 				printf("Comando %s ejecutado en segundo plano con pid %d.\n", args[0], pid_fork);
 			} else {
-				pid_wait = waitpid(pid_fork, &status, 0);
+
+				set_terminal(pid_fork); // ceder el terminal al hijo
+				pid_wait = waitpid(pid_fork, &status, WUNTRACED);
 				status_res = analyze_status(status, &info);
-				printf("Comando %s ejecutado en primer plano con pid %d. Estado finalizado. Info: %d\n", args[0], pid_fork, info);
+
+				if (status_res == EXITED) {
+					printf("El hijo en fg acabó con normalidad y devolvió %d\n", info);
+				}
+
+				if (status_res == SIGNALED) {
+					printf("El hijo en fg lo mataron con la señal: %d\n", info);
+				}
+
+				set_terminal(getpid()); // shell recupera el terminal
 			}
 
 		} else if (pid_fork == 0) {
 			// HIJO
+			new_process_group(getpid()); // hijo -> me voy
+			if (background) {
+			} else {
+				set_terminal(getpid()); // ceder el terminal al hijop
+			}
+			terminal_signals(SIG_DFL);
 			execvp(args[0], args);
 			// Si llegamos aquí es porque exec falló
 			perror("Exec falló");
