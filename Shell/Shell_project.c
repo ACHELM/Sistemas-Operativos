@@ -17,6 +17,7 @@ To compile and run the program:
 #include "job_control.h"   // remember to compile with module job_control.c 
 
 #define MAX_LINE 256 /* 256 chars per line, per command, should be enough. */
+#include <string.h>
 
 // -----------------------------------------------------------------------
 //                            MAIN          
@@ -41,6 +42,21 @@ int main(void)
 		
 		if(args[0]==NULL) continue;   // if empty command
 
+		if (! strcmp(args[0], "hola")) {
+			printf("hola mundo\n");
+			continue;
+		}
+
+		if (! strcmp(args[0], "cd")) {
+			int err;
+			if (args[1] == NULL){
+				err = chdir (getenv("HOME"));
+			} else {
+				err = chdir (args[1]);
+			}
+			if (err) {fprintf(stderr, "Error en chdir\n");}
+			continue;
+		}
 		pid_fork = fork();
 
 		if (pid_fork > 0) {
