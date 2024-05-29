@@ -23,6 +23,51 @@ To compile and run the program:
 //                            MAIN          
 // -----------------------------------------------------------------------
 
+// La lista es una estructura global
+job *lista;
+
+void mysigchld(int s) {
+	// Recorra la lista -> waitpid NO BLOQUEANTE y proceder
+
+	// printf("Se recibió SIGCHLD\n"); // NO SE ACONSEJA usar printf en una señal
+	// MANEJADOR DE SIGCHLD ->
+	// recorrer todos los jobs en bg y suspendidor a ver
+	// qué les ha pasado:
+	// SI MUERTOS -> quitar de la lista
+	// SI CAMBIAN DE ESTADO -> cambiar el job correspondiente
+
+	int status, info, pid_wait;
+	enum status status_res; /* status processed by analyze_status() */
+	job *jb;
+
+	for (int i = 1; i <= list_size(lista); ++i) {
+		jb = get_item_bypos(lista, i);
+		pid_wait = waitpid(jb->pgid, &status, WNOHANG | WUNTRACED | WCONTINUED);
+		
+		if (pid_wait == jb->pgid) { // A este jobs le ha pasado algo
+			status_res = analyze_status(status, &info);
+			// que puede ocurrir?
+			// - EXITED
+			// - SIGNALED
+			// - SUSPENDED
+			// - CONTINUED
+			printf("[SIGCHLD] Wait realizado para trabajo en background: %s, pid=%i\n", jb->command, pid_wait);
+			/* Actuar según los posibles casos reportados por status
+				Al menos hay que considerar EXITED, SIGNALED y SUSPENDED
+				En este ejemplo sólo se consideran los dos primeros */
+			if ( (status_res == SIGNALED) || (status_res == EXITED) ) {
+				delete_job(lista, jb);
+				--i; // Ojo! El siguiente ha ocupado la posición de este en la lista
+			}
+
+			if ( status_res == CONTINUED) { jb->state = BACKGROUND; } // SOLO CAMBIAR DE ESTADO
+			if ( status_res == SUSPENDED) { jb->state = STOPPED; } // SOLO CAMBIAR DE ESTADO
+		}
+	}
+
+	return ;
+}
+
 int main(void)
 {
 	char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
@@ -34,7 +79,13 @@ int main(void)
 	enum status status_res; /* status processed by analyze_status() */
 	int info;				/* info processed by analyze_status() */
 
+	lista = new_list("unalista");
+
+	job *nuevo; // Para almacenar un nuevo job
+
 	terminal_signals(SIG_IGN); //^z ^c -> inmune, superpoderes de terminal
+
+	signal(SIGCHLD, mysigchld); // Instalamos el SIGCHLD
 
 	while (1)   /* Program terminates normally inside get_command() after ^D is typed*/
 	{   		
@@ -67,6 +118,13 @@ int main(void)
 			// PADRE -> Shell
 
 			if (background) {
+				// Poner job en la lista
+
+				// Nuevo nodo job -> nuevo job BACKGROUD
+				nuevo = new_job(pid_fork, args[0], BACKGROUND); // Nuevo nodo job
+				block_SIGCHLD(); // enmascarar sigchld (sección libre de sigchld )
+				add_job(lista, nuevo);
+				unblock_SIGCHLD();
 				printf("Comando %s ejecutado en segundo plano con pid %d.\n", args[0], pid_fork);
 			} else {
 
@@ -82,6 +140,18 @@ int main(void)
 					printf("El hijo en fg lo mataron con la señal: %d\n", info);
 				}
 
+				if (status_res == SUSPENDED) {
+					printf("El hijo en fg se suspendio\n");
+
+					// Poner job (hijo) suspendido en la lista
+
+					nuevo = new_job(pid_fork, inputBuffer, STOPPED);
+
+					block_SIGCHLD();
+					add_job(lista, nuevo);
+					unblock_SIGCHLD();
+
+				}
 				set_terminal(getpid()); // shell recupera el terminal
 			}
 
