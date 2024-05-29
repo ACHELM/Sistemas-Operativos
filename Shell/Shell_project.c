@@ -41,6 +41,31 @@ int main(void)
 		
 		if(args[0]==NULL) continue;   // if empty command
 
+		pid_fork = fork();
+
+		if (pid_fork > 0) {
+			// PADRE -> Shell
+
+			if (background) {
+				printf("Comando %s ejecutado en segundo plano con pid %d.\n", args[0], pid_fork);
+			} else {
+				pid_wait = waitpid(pid_fork, &status, 0);
+				status_res = analyze_status(status, &info);
+				printf("Comando %s ejecutado en primer plano con pid %d. Estado finalizado. Info: %d\n", args[0], pid_fork, info);
+			}
+
+		} else if (pid_fork == 0) {
+			// HIJO
+			execvp(args[0], args);
+			// Si llegamos aquí es porque exec falló
+			perror("Exec falló");
+			exit(EXIT_FAILURE);
+		} else {
+
+			fprintf(stderr, "Error en fork\n");
+			continue;
+		}
+
 		/* the steps are:
 			 (1) fork a child process using fork()
 			 (2) the child process will invoke execvp()
