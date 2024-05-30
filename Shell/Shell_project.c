@@ -111,6 +111,96 @@ int main(void)
 			continue;
 		}
 
+		if (! strcmp(args[0], "jobs")) {
+			block_SIGCHLD();
+			print_job_list(lista);
+			unblock_SIGCHLD();
+			continue;
+		}
+
+		if (! strcmp(args[0], "fg")) {
+			// Obtenemos la posición del job
+			int pos = 1;
+			if (args[1] != NULL) {
+				pos = atoi(args[1]);
+				if (pos <= 0) {
+					fprintf(stderr, "Error en el argumento de fg\n");
+					continue;
+				}
+			}
+
+			// Acedemos a la lista
+			block_SIGCHLD();
+			job *job = get_item_bypos(lista, pos);
+			unblock_SIGCHLD();
+
+			if (job == NULL) {
+				fprintf(stderr, "Job no encontrado\n");
+				continue;
+			}
+
+			// Cedemos la terminal
+			set_terminal(job->pgid);
+
+			if (job->state == STOPPED) {
+				// Mandamos una señal
+				killpg(job->pgid, SIGCONT);
+			}
+
+			pid_wait = waitpid(job->pgid, &status, WUNTRACED);
+
+			status_res = analyze_status(status, &info);
+
+			if ((status_res == EXITED) || (status_res == SIGNALED)) {
+				printf("El hijo en fg lo mataron o murio con la señal: %d\n", info);
+
+				block_SIGCHLD();
+				delete_job(lista, job);
+				unblock_SIGCHLD();
+			}
+
+			if (status_res == SUSPENDED) {
+				printf("El hijo en fg se suspendió\n");
+				block_SIGCHLD();
+				job->state = STOPPED;
+				unblock_SIGCHLD();
+			}
+
+			set_terminal(getpid()); // shell recupera el terminal
+			continue;
+		}
+
+		if (! strcmp(args[0], "bg")) {
+			// Obtenemos la posición del job
+			int pos = 1;
+			if (args[1] != NULL) {
+				pos = atoi(args[1]);
+				if (pos <= 0) {
+					fprintf(stderr, "Error en el argumento de bg\n");
+					continue;
+				}
+			}
+
+			// Acedemos a la lista
+			block_SIGCHLD();
+			job *job = get_item_bypos(lista, pos);
+			unblock_SIGCHLD();
+
+			if (job == NULL) {
+				fprintf(stderr,"Job no encontrado\n");
+				continue;
+			}
+
+			block_SIGCHLD();
+			if (job->state == STOPPED) {
+				job->state = BACKGROUND;
+				// Mandamos una señal de grupo para reaunadar
+				killpg(job->pgid, SIGCONT);
+			}
+
+			unblock_SIGCHLD();
+			continue;
+		}
 
 		pid_fork = fork(); // Comando externo
 
