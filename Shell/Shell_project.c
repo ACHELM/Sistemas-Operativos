@@ -257,7 +257,7 @@ int main(void)
 				block_SIGCHLD(); // enmascarar sigchld (sección libre de sigchld )
 				add_job(lista, nuevo);
 				unblock_SIGCHLD();
-				printf("Comando %s ejecutado en segundo plano con pid %d.\n", args[0], pid_fork);
+				// printf("Comando %s ejecutado en segundo plano con pid %d.\n", args[0], pid_fork);
 			} else {
 
 				set_terminal(pid_fork); // ceder el terminal al hijo
@@ -295,6 +295,32 @@ int main(void)
 				set_terminal(getpid()); // ceder el terminal al hijop
 			}
 			terminal_signals(SIG_DFL);
+
+			if (file_out) {
+				// Hay redirección de salida
+				FILE *f = fopen(file_out, "w");
+				if (f) {
+					dup2(fileno(f), fileno(stdout));
+					fclose(f);
+				} else {
+					fprintf(stderr, "error...\n");
+				}
+			}
+
+			if (file_in) {
+
+				// Hay redirección de entrada
+				FILE *f = fopen(file_in, "r");
+				if (f) {
+					dup2(fileno(f), fileno(stdin));
+					fclose(f);
+				} else {
+					fprintf(stderr, "error...\n");
+				}
+			}
+					
+
+
 			execvp(args[0], args);
 			// Si llegamos aquí es porque exec falló
 			perror("Exec falló");
